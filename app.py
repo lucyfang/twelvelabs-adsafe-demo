@@ -150,16 +150,34 @@ def parse_stream(response_text: str) -> str:
 
 
 def create_index(api_key: str, name: str) -> str:
-    """Create a new index with both Pegasus (analyze) and Marengo (search)."""
+    """Create a new index with both Pegasus (analyze) and Marengo (search).
+
+    Field names per v1.3 docs:
+      index_name  (not "name")
+      model_name  (not "name")
+      model_options (not "options")
+    """
     payload = {
-        "name": name,
+        "index_name": name,
         "models": [
-            {"name": "pegasus1.2", "options": ["visual", "audio"]},
-            {"name": "marengo3.0", "options": ["visual", "audio"]},
+            {"model_name": "pegasus1.2", "model_options": ["visual", "audio"]},
+            {"model_name": "marengo3.0", "model_options": ["visual", "audio"]},
         ],
+        "addons": ["thumbnail"],  # enables thumbnail_urls in HLS metadata
     }
     r = requests.post(f"{BASE_URL}/indexes", headers=auth_headers(api_key), json=payload)
-    r.raise_for_status()
+    if not r.ok:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text[:400]
+        raise RuntimeError(
+            f"create_index failed ({r.status_code}): {detail}\n\n"
+            f"Common causes:\n"
+            f"  • Index name already exists — try a different name in the sidebar\n"
+            f"  • Invalid API key\n"
+            f"  • model name/options rejected — check TwelveLabs dashboard for available models"
+        )
     data = r.json()
     return data.get("_id") or data.get("id")
 
