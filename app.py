@@ -269,7 +269,7 @@ def analyze_video(api_key: str, video_id: str, prompt: str) -> str:
     # leaving ~1,058 chars for brand + product + brief combined.
     # Guard fires 200 chars before the limit so the API never sees an oversized prompt.
     MAX_PROMPT_CHARS  = 7800
-    BASE_PROMPT_CHARS = 5568   # length of prompt with empty brand/product/brief
+    BASE_PROMPT_CHARS = 5930   # length of prompt with empty brand/product/brief
     CONTEXT_BUDGET    = MAX_PROMPT_CHARS - BASE_PROMPT_CHARS
     if len(prompt) > MAX_PROMPT_CHARS:
         context_used = len(prompt) - BASE_PROMPT_CHARS
@@ -376,10 +376,10 @@ WARN: alcohol prominent on camera; prescription skincare framed as part of routi
 PASS: no substances or illegal activity.
 
 P4 UNSAFE PRODUCT USAGE
-CRITICAL — WATERLINE: Applying any eye-area product (eyeliner, kajal, kohl, gel liner, eyeshadow, mascara) to the waterline/inner eyelid is FAIL unless on-screen text states "ophthalmologist tested for waterline use". This includes spoken recommendations to apply to the waterline even without on-screen demonstration. Non-eye products (foundation, concealer, blush, serum, moisturizer, primer) cannot physically reach the waterline — never flag these.
-FAIL: waterline application shown on screen OR spoken recommendation to apply to waterline; product on broken skin; ingested/inhaled; dangerous combos (high-AHA + retinol; undiluted essential oils); double-dipping; visibly dirty tools; tester on face.
-WARN: sloppy technique; tools appear unclean; eye-area product adjacent to (not on) waterline; inadvisable combo without caveat.
-PASS: safe application; no unsanitary technique.
+CRITICAL — WATERLINE: Only flag if creator is actively applying eyeliner, kajal, kohl, or gel liner to the waterline/inner eyelid on screen, OR verbally recommends doing so — unless on-screen text states "ophthalmologist tested for waterline use". Mascara applied to eyelashes is always PASS — eyelashes are not the waterline. A creator who simply has eyeliner already on their waterline is NOT a violation. Non-eye products (foundation, concealer, blush, serum, moisturizer, primer) cannot reach the waterline — never flag these.
+FAIL: active on-screen application of eyeliner/kajal/kohl/gel liner to inner eyelid; verbal recommendation to apply any product to waterline; product on broken skin; ingested/inhaled; dangerous combos (high-AHA + retinol; undiluted essential oils); double-dipping; visibly dirty tools; tester on face.
+WARN: sloppy technique; tools appear unclean; inadvisable combo without caveat.
+PASS: mascara on eyelashes; creator wearing eyeliner on waterline without demonstrating or recommending application; eyeshadow on eyelid; safe technique overall.
 
 P5 MEDICAL/COSMETIC CLAIMS
 SILENT VISUAL CLAIM: Any split-screen, before/after, or side-by-side showing skin improvement is a structural drug claim — FAIL regardless of disclaimers or spoken words.
@@ -396,26 +396,26 @@ on_brief: correct product clear subject >50%; creator names/demos it. Score 65�
 
 EVIDENCE RULE: verbatim only, and always clarify how the violation occurred:
 - Spoken: quote the exact words, prefixed with "Said:" e.g. Said: "I apply this to my waterline every day"
-- Visual: describe exactly what is seen e.g. "Applies eyeliner to inner eyelid"
+- Visual: describe exactly what is seen as a static observation, not an inferred action. e.g. "Eyeliner visibly on waterline" not "Applies eyeliner to waterline". Only use active verbs if the application is actively shown happening on screen.
 Never describe a spoken violation as if it were physically demonstrated, or vice versa.
 TIMESTAMP RULE: timestamp_sec = exact second violation occurs or is spoken. Not nearby. before/after at 0:31 → 31. "disgusting" spoken at 0:06 → 6.
 
-OUTPUT — valid JSON only, no markdown:
+OUTPUT — valid JSON only, no markdown. Keep string values concise (under 20 words each).
 {{
-  "description": "<2-4 sentences: observable setting, actions, verbatim quotes — do not infer from brief>",
+  "description": "<2-5 sentences: observable setting, actions, verbatim quotes — do not infer from brief>",
   "verdict": "<APPROVE|REVIEW|BLOCK>",
-  "verdict_reasoning": "<1-2 sentences>",
-  "campaign_relevance": {{"status":"<on_brief|borderline|off_brief>","score":<0-100>,"reasoning":"<one sentence>"}},
+  "verdict_reasoning": "<1 sentence>",
+  "campaign_relevance": {{"status":"<on_brief|borderline|off_brief>","score":<0-100>,"reasoning":"<1 sentence>"}},
   "policies": {{
-    "hate_harassment":         {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<Said: verbatim OR visual description>"}}],"reasoning":"<one sentence>"}},
-    "profanity_explicit":      {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<Said: verbatim OR visual description>"}}],"reasoning":"<one sentence>"}},
-    "drugs_illegal":           {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<Said: verbatim OR visual description>"}}],"reasoning":"<one sentence>"}},
-    "unsafe_product_usage":    {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<Said: verbatim OR visual description>"}}],"reasoning":"<one sentence>"}},
-    "medical_cosmetic_claims": {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<Said: verbatim OR visual description>"}}],"reasoning":"<one sentence>"}}
+    "hate_harassment":         {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<verbatim quote or visual description>"}}],"reasoning":"<1 sentence>"}},
+    "profanity_explicit":      {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<verbatim quote or visual description>"}}],"reasoning":"<1 sentence>"}},
+    "drugs_illegal":           {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<verbatim quote or visual description>"}}],"reasoning":"<1 sentence>"}},
+    "unsafe_product_usage":    {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<verbatim quote or visual description>"}}],"reasoning":"<1 sentence>"}},
+    "medical_cosmetic_claims": {{"status":"<pass|warn|fail>","confidence":"<high|medium|low>","violations":[{{"timestamp_sec":<int|null>,"evidence":"<verbatim quote or visual description>"}}],"reasoning":"<1 sentence>"}}
   }}
 }}
 
-List ALL distinct violations in the violations array — one entry per moment. If pass, use violations:[].
+List ALL distinct violations — one entry per moment. If pass, violations:[].
 CONFIDENCE: high=unambiguous; medium=some ambiguity; low=uncertain(triggers REVIEW).
 VERDICT: BLOCK=any fail or off_brief; REVIEW=any warn/borderline/low-confidence; APPROVE=all pass+on_brief+medium+.
 Return only valid JSON.
@@ -442,17 +442,34 @@ def run_compliance_check(api_key: str, video_id: str,
     except json.JSONDecodeError:
         pass
 
-    # Second try: Pegasus sometimes truncates mid-JSON, leaving unclosed braces/brackets.
-    # Count open vs closed braces and append the missing closers.
+    # Second try: trim back to last structurally sound position and close open brackets/braces.
+    # Handles truncation mid-string (inside evidence/reasoning values) by walking back
+    # to the last complete key-value delimiter before appending closers.
     try:
-        fixed = cleaned
-        fixed = fixed.rstrip()
-        # If it ends mid-string or mid-value, trim back to last clean delimiter
-        while fixed and fixed[-1] not in ('}', ']', '"', '0123456789'):
+        fixed = cleaned.rstrip()
+        # Walk back past any incomplete string — find last unambiguous structural char
+        # Drop trailing partial token: anything after the last '}' or ']' or complete '"..."'
+        # Strategy: trim to last char that could end a valid JSON value
+        while fixed and fixed[-1] not in ('}', ']'):
             fixed = fixed[:-1]
-        # If ends with an incomplete key-value (trailing comma or colon), strip it
+        if not fixed:
+            raise ValueError("nothing left after trim")
+        open_braces   = fixed.count("{") - fixed.count("}")
+        open_brackets = fixed.count("[") - fixed.count("]")
+        fixed += "]" * open_brackets + "}" * open_braces
+        parsed = json.loads(fixed)
+        return enforce_campaign_relevance(parsed, product)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Third try: close open strings then close brackets/braces
+    try:
+        fixed = cleaned.rstrip()
+        # If we're inside an unclosed string, close it
+        quote_count = fixed.count('"') - fixed.count('\\"')
+        if quote_count % 2 == 1:
+            fixed += '"'
         fixed = fixed.rstrip(',').rstrip(':').rstrip()
-        # Re-count after trimming
         open_braces   = fixed.count("{") - fixed.count("}")
         open_brackets = fixed.count("[") - fixed.count("]")
         fixed += "]" * open_brackets + "}" * open_braces
@@ -465,42 +482,30 @@ def run_compliance_check(api_key: str, video_id: str,
 def fetch_timestamped_evidence(api_key: str, index_id: str, video_id: str,
                                 result: dict) -> dict[str, list[dict]]:
     """
-    Timestamp strategy: Marengo search primary for all policies, Pegasus fallback.
-
-    Pegasus timestamp_sec drifts consistently — it cites where it *started reasoning*
-    about a violation, not where it visually/audibly occurs. Marengo searching the
-    actual evidence text (visual + transcription) finds the real moment more reliably.
-
-    For each flagged policy:
-      1. Run Marengo search on the Pegasus evidence string (both visual + transcription).
-         This finds the frame/second where that content actually appears.
-      2. If evidence is empty or Marengo returns nothing, fall back to Pegasus timestamp_sec.
-
-    Returns clips_by_policy: {policy_key: [{"start": int, "end": int}]}
+    Returns {policy_key: [{"evidence": str, "clip": {"start": int, "end": int} | None}]}
+    One entry per violation, evidence and its resolved clip kept together.
     """
-    clips_by_policy = {}
-    policies        = result.get("policies", {})
-    CLIP_WINDOW     = 10
-    SKIP_EVIDENCE   = {"none detected", "none", "n/a", ""}
+    by_policy   = {}
+    policies    = result.get("policies", {})
+    CLIP_WINDOW = 10
+    SKIP        = {"none detected", "none", "n/a", ""}
 
-    def marengo_clip(query: str) -> list[dict]:
+    def marengo_clip(query: str) -> dict | None:
         try:
             hits = search_clips(
                 api_key, index_id, video_id, query,
                 page_limit=1, threshold="medium",
                 search_options=["visual", "transcription"],
             )
-            return [
-                {
-                    "start": int(c.get("start_time", c.get("start", 0))),
-                    "end":   int(c.get("end_time",   c.get("end",   0))),
-                }
-                for c in hits
-                if c.get("start_time") is not None or c.get("start") is not None
-            ]
+            for c in hits:
+                if c.get("start_time") is not None or c.get("start") is not None:
+                    return {
+                        "start": int(c.get("start_time", c.get("start", 0))),
+                        "end":   int(c.get("end_time",   c.get("end",   0))),
+                    }
         except Exception:
-            return []
-
+            pass
+        return None
 
     for key in POLICY_CATEGORIES:
         policy = policies.get(key, {})
@@ -508,31 +513,30 @@ def fetch_timestamped_evidence(api_key: str, index_id: str, video_id: str,
             continue
 
         violations = policy.get("violations") or []
-        # Fallback: support old single-evidence schema if violations is absent
         if not violations:
             ev = (policy.get("evidence") or "").strip()
             ts = policy.get("timestamp_sec")
             violations = [{"evidence": ev, "timestamp_sec": ts}]
 
-        all_clips = []
+        paired = []
         for v in violations:
             evidence = (v.get("evidence") or "").strip()
-            clips = []
-            if evidence.lower() not in SKIP_EVIDENCE:
-                clips = marengo_clip(evidence)
-            if not clips:
+            clip = None
+            if evidence.lower() not in SKIP:
+                clip = marengo_clip(evidence)
+            if clip is None:
                 ts = v.get("timestamp_sec")
                 if ts is not None:
                     try:
                         t = int(ts)
-                        clips = [{"start": t, "end": t + CLIP_WINDOW}]
+                        clip = {"start": t, "end": t + CLIP_WINDOW}
                     except (TypeError, ValueError):
                         pass
-            all_clips.extend(clips)
+            paired.append({"evidence": evidence, "clip": clip})
 
-        clips_by_policy[key] = all_clips
+        by_policy[key] = paired
 
-    return clips_by_policy
+    return by_policy
 
 
 # ── Campaign relevance enforcement ───────────────────────────────────────────
@@ -668,7 +672,10 @@ def render_verdict_badge(verdict: str):
     )
 
 
-def render_policy_row(key: str, policy: dict, clips: list[dict]):
+def render_policy_row(key: str, policy: dict, paired: list[dict]):
+    """
+    paired: [{"evidence": str, "clip": {"start": int, "end": int} | None}]
+    """
     label      = POLICY_LABELS.get(key, key)
     status     = policy.get("status", "pass")
     confidence = policy.get("confidence", "high")
@@ -680,14 +687,16 @@ def render_policy_row(key: str, policy: dict, clips: list[dict]):
     icon      = STATUS_ICON.get(status, "")
     conf_icon = CONF_ICON.get(confidence, "")
 
-    # Normalise: new schema uses violations[], old schema uses evidence + timestamp_sec
-    violations = policy.get("violations") or []
-    if not violations:
-        ev = (policy.get("evidence", "") or "").replace("[AUTO] ", "")
-        if ev and ev.lower() != "none detected":
-            violations = [{"evidence": ev, "timestamp_sec": policy.get("timestamp_sec")}]
+    # Normalise: if caller passed old flat clip list, wrap it
+    if paired and isinstance(paired[0], dict) and "start" in paired[0]:
+        paired = [{"evidence": policy.get("evidence", ""), "clip": c} for c in paired]
 
-    with st.expander(f"{icon} **{label}** — `{status.upper()}`  {conf_icon} confidence: `{confidence}`"):
+    # Also pull violations from policy if paired is empty (pass case)
+    if not paired:
+        violations = policy.get("violations") or []
+        paired = [{"evidence": v.get("evidence", ""), "clip": None} for v in violations]
+
+    with st.expander(f"{icon} **{label}** — `{status.upper()}`  {conf_icon} confidence: `{confidence}`", expanded=status in ("warn", "fail")):
         col_left, col_right = st.columns([1, 2])
 
         with col_left:
@@ -696,27 +705,26 @@ def render_policy_row(key: str, policy: dict, clips: list[dict]):
             st.markdown(f"**Confidence:** <span class='conf-{confidence}'>{confidence}</span>", unsafe_allow_html=True)
 
         with col_right:
-            for i, v in enumerate(violations):
-                ev_text = (v.get("evidence") or "").replace("[AUTO] ", "")
-                if not ev_text or ev_text.lower() == "none detected":
+            shown_any = False
+            for p in paired:
+                ev_text = (p.get("evidence") or "").replace("[AUTO] ", "").strip()
+                if not ev_text or ev_text.lower() in ("none detected", "none", "n/a", ""):
                     continue
-                # Timestamp: use corresponding clip if available, else violation's own timestamp_sec
-                clip_ts = clips[i]["start"] if i < len(clips) and clips[i].get("start") is not None else v.get("timestamp_sec")
+                clip    = p.get("clip")
+                clip_ts = clip["start"] if clip else None
                 ts_badge = f' <span class="timestamp-chip">⏱ {fmt_time(clip_ts)}</span>' if clip_ts is not None else ""
                 st.markdown(
                     f'<div class="evidence-block">📌 <strong>Evidence:</strong>{ts_badge} {ev_text}</div>',
                     unsafe_allow_html=True,
                 )
+                shown_any = True
             if reasoning:
-                st.markdown(
-                    f'<div class="reasoning-block">💬 {reasoning}</div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="reasoning-block">💬 {reasoning}</div>', unsafe_allow_html=True)
 
-        if clips:
-            starts = [fmt_time(int(c["start"])) + "–" + fmt_time(int(c.get("end", c["start"])))
-                      for c in clips if c.get("start") is not None]
-            chips = "  ".join(f'<span class="timestamp-chip">⏱ {s}</span>' for s in starts)
+        clips_with_ts = [p["clip"] for p in paired if p.get("clip") and p["clip"].get("start") is not None]
+        if clips_with_ts:
+            starts = [fmt_time(int(c["start"])) + "–" + fmt_time(int(c.get("end", c["start"]))) for c in clips_with_ts]
+            chips  = "  ".join(f'<span class="timestamp-chip">⏱ {s}</span>' for s in starts)
             st.markdown(chips, unsafe_allow_html=True)
             st.caption("↑ click Jump buttons next to the player to seek")
         elif status in ("warn", "fail"):
@@ -731,8 +739,26 @@ def render_results(result: dict, clips: dict, video_url: str):
 
     verdict   = result.get("verdict", "REVIEW")
     desc      = result.get("description", "")
-    reasoning = result.get("verdict_reasoning", "")
     relevance = result.get("campaign_relevance", {})
+    policies  = result.get("policies", {})
+
+    # Derive verdict reasoning from actual data — Pegasus text is often imprecise
+    def _derive_verdict_reasoning(verdict: str, relevance: dict, policies: dict) -> str:
+        rel_status = relevance.get("status", "on_brief")
+        fails  = [POLICY_LABELS[k].split(" / ")[0] for k in POLICY_CATEGORIES if policies.get(k, {}).get("status") == "fail"]
+        warns  = [POLICY_LABELS[k].split(" / ")[0] for k in POLICY_CATEGORIES if policies.get(k, {}).get("status") == "warn"]
+        parts  = []
+        if rel_status == "off_brief":
+            parts.append("Video is off-brief")
+        elif rel_status == "borderline":
+            parts.append("Video is borderline on-brief")
+        if fails:
+            parts.append(f"Policy failures: {', '.join(fails)}")
+        if warns:
+            parts.append(f"Policy warnings: {', '.join(warns)}")
+        if not parts:
+            return "All policies pass and video is on-brief." if verdict == "APPROVE" else ""
+        return ". ".join(parts) + "."
 
     def _clean_reasoning(text: str) -> str:
         """Strip [AUTO-OVERRIDE] prefix and 'Original ...' trailer from displayed text."""
@@ -751,8 +777,9 @@ def render_results(result: dict, clips: dict, video_url: str):
     with col_v:
         st.markdown("### Verdict")
         render_verdict_badge(verdict)
-        if reasoning:
-            st.caption(_clean_reasoning(reasoning))
+        derived_reasoning = _derive_verdict_reasoning(verdict, relevance, policies)
+        if derived_reasoning:
+            st.caption(derived_reasoning)
 
     with col_r:
         st.markdown("### Campaign Relevance")
@@ -782,17 +809,14 @@ def render_results(result: dict, clips: dict, video_url: str):
     # Collect all flagged timestamps — from Marengo clips (visual policies)
     # and Pegasus timestamp_sec (audio policies) — for the jump panel and seek buttons.
     ts_set = set()
-    all_clips_flat = []   # (policy_label, start, end, evidence) for side panel
-    for pol_key, clip_list in clips.items():
-        pol_data   = result.get("policies", {}).get(pol_key, {})
-        violations = pol_data.get("violations") or []
-        # Build a flat list of evidence strings aligned with clip_list order
-        ev_strings = [v.get("evidence", "") for v in violations] if violations else [pol_data.get("evidence", "")]
-        for i, c in enumerate(clip_list):
-            if c.get("start") is not None:
-                ev = ev_strings[i] if i < len(ev_strings) else (ev_strings[0] if ev_strings else "")
-                ts_set.add(int(c["start"]))
-                all_clips_flat.append((POLICY_LABELS.get(pol_key, pol_key), int(c["start"]), int(c.get("end", c["start"])), ev))
+    all_clips_flat = []
+    for pol_key, paired_list in clips.items():
+        for p in paired_list:
+            clip = p.get("clip")
+            if clip and clip.get("start") is not None:
+                ev = p.get("evidence", "")
+                ts_set.add(int(clip["start"]))
+                all_clips_flat.append((POLICY_LABELS.get(pol_key, pol_key), int(clip["start"]), int(clip.get("end", clip["start"])), ev))
     all_timestamps = sorted(ts_set)
 
     video_source  = video_url or st.session_state.get("video_bytes")
@@ -815,12 +839,12 @@ def render_results(result: dict, clips: dict, video_url: str):
 <script>
   var src="{video_source}", t={seek_to};
   var v=document.getElementById("v");
-  function nativeLoad(){{v.src=src;v.addEventListener("loadedmetadata",function(){{v.currentTime=t;v.play();}});}}
+  function nativeLoad(){{v.src=src;v.addEventListener("loadedmetadata",function(){{v.currentTime=t;}});}}
   if(Hls.isSupported()){{
     var h=new Hls();
     h.loadSource(src);
     h.attachMedia(v);
-    h.on(Hls.Events.MANIFEST_PARSED,function(){{v.currentTime=t;v.play();}});
+    h.on(Hls.Events.MANIFEST_PARSED,function(){{v.currentTime=t;}});
     h.on(Hls.Events.ERROR,function(e,d){{if(d.fatal){{h.destroy();nativeLoad();}}}});
     setTimeout(function(){{if(v.readyState===0){{h.destroy();nativeLoad();}}}},5000);
   }}else{{nativeLoad();}}
@@ -867,7 +891,6 @@ def render_results(result: dict, clips: dict, video_url: str):
 
     # ── Policy scorecard
     st.markdown("### Policy Scorecard")
-    policies = result.get("policies", {})
 
     # Summary bar — quick visual of all policy statuses
     cols = st.columns(len(POLICY_CATEGORIES))
@@ -888,10 +911,23 @@ def render_results(result: dict, clips: dict, video_url: str):
                                      "evidence": "none detected", "reasoning": ""})
         render_policy_row(key, policy, clips.get(key, []))
 
+    # Verdict consistency check — warn if verdict implies violations but all policies show pass
+    policy_statuses = [policies.get(k, {}).get("status", "pass") for k in POLICY_CATEGORIES]
+    rel_status = result.get("campaign_relevance", {}).get("status", "on_brief")
+    has_flagged_policy = any(s in ("warn", "fail") for s in policy_statuses)
+    if verdict in ("BLOCK", "REVIEW") and not has_flagged_policy and rel_status == "on_brief":
+        st.warning(
+            "⚠️ Verdict mismatch: the overall verdict is " + verdict +
+            " but no individual policy violations were returned. "
+            "This usually means Pegasus truncated its output — check Raw JSON below.",
+            icon=None,
+        )
+
     st.divider()
 
-    # Raw JSON — for technical credibility during the demo
-    with st.expander("🔩 Raw JSON output"):
+    # Raw JSON — always expanded when there's a verdict mismatch
+    mismatch = verdict in ("BLOCK", "REVIEW") and not has_flagged_policy and rel_status == "on_brief"
+    with st.expander("🔩 Raw JSON output", expanded=mismatch):
         st.json({"compliance_result": result, "timestamped_clips": clips})
 
 
