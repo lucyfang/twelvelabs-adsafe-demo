@@ -285,7 +285,7 @@ def analyze_video(api_key: str, video_id: str, prompt: str) -> str:
     # leaving ~2,372 chars for brand + product + brief combined.
     # Guard fires 200 chars before the limit so the API never sees an oversized prompt.
     MAX_PROMPT_CHARS = 8000
-    BASE_PROMPT_CHARS = 5638   # length of prompt with empty brand/product/brief
+    BASE_PROMPT_CHARS = 6979   # length of prompt with empty brand/product/brief
     CONTEXT_BUDGET    = MAX_PROMPT_CHARS - BASE_PROMPT_CHARS
     if len(prompt) > MAX_PROMPT_CHARS:
         context_used = len(prompt) - BASE_PROMPT_CHARS
@@ -370,6 +370,12 @@ def build_compliance_prompt(brand: str, product: str, brief: str) -> str:
 You are a strict compliance reviewer for beauty/cosmetics creator ads.
 Apply strict liability — default to FLAG. Only visible or audible evidence counts; world knowledge is not a defence.
 
+AUDITORY vs VISUAL — apply to every policy:
+- Auditory claim: something said but not physically shown. Evidence must start with Said: + verbatim quote.
+- Visual confirmation: a physical action or state seen on screen. Describe what is seen, not what is said.
+- Never describe an action as occurring unless you see physical contact or motion on screen. If the creator describes an action not visually shown, label it "Speaker describes [action]" — not as a physical event.
+- A violation is auditory OR visual. Never conflate them.
+
 CAMPAIGN CONTEXT
 Brand:   {brand}
 Product: {product}
@@ -393,19 +399,21 @@ WARN: alcohol prominently on camera; prescription skincare (tretinoin, Accutane)
 PASS: no substances or illegal activity.
 
 P4 UNSAFE PRODUCT USAGE
-WATERLINE: Flag ONLY if actively applying eyeliner/kajal/kohl/gel liner to inner eyelid on screen, OR verbally recommends it (unless "ophthalmologist tested"). Mascara on lashes = PASS. Creator wearing eyeliner on waterline without applying/recommending = PASS. Foundation/concealer/blush/serum/primer cannot reach waterline — never flag.
-VERBAL EVIDENCE: if spoken, must start with Said: + exact quote. Never describe a verbal recommendation as physical application.
-FAIL: active waterline application on screen; verbal waterline recommendation; product on broken skin; ingested/inhaled; dangerous combos (high-AHA+retinol, undiluted essential oils); double-dipping; dirty tools; tester on face.
+WATERLINE — TWO-STEP TEST. Apply both steps before flagging.
+Step 1 — Is application happening? You must see physical motion of a liner tool contacting the inner eyelid on screen RIGHT NOW. If no such motion is visible, stop — PASS. Do not flag.
+Step 2 — Only if Step 1 is YES: is it eyeliner/kajal/kohl/gel liner (not mascara, not foundation, not any non-eye product)? If yes → FAIL. If a verbal recommendation to apply to waterline is made → FAIL (Said: required). Exception: if on-screen text states "ophthalmologist tested for waterline use" → PASS.
+NEVER flag: eyeliner already worn on the waterline with no application motion shown; foundation/concealer/blush/serum/moisturizer/primer near the eye; mascara on lashes.
+FAIL: active liner application to inner eyelid (motion visible); verbal waterline recommendation; product on broken skin; ingested/inhaled; dangerous combos (high-AHA+retinol, undiluted essential oils); double-dipping; dirty tools; tester on face.
 WARN: sloppy technique; unclean tools; inadvisable combo without caveat.
-PASS: mascara on lashes; eyeliner worn but not applied/recommended; eyeshadow on lid.
+PASS: eyeliner present on waterline, no application motion shown; mascara on lashes; eyeshadow on lid; any non-liner product near eye.
 
 P5 MEDICAL/COSMETIC CLAIMS
 SILENT VISUAL CLAIMS: Before/after = drug claim only if underlying skin improved (acne cleared, pores/texture/tone/wrinkles changed). Before/after showing cosmetic product effect (foundation coverage, lip colour, blush) = PASS — that is product demo.
 THIRD-PARTY CLAIMS: "My dermatologist said X" = unsubstantiated authority claim even when quoted.
 FTC DISCLOSURE: Must be spoken or large on-screen text at video START.
 FAIL: treats/cures/heals claims; structural claims (collagen, pores, wrinkles); "clinically proven/dermatologist approved/#1" without source; third-party authority; before/after skin improvement; FTC disclosure absent or late.
-WARN: "helps repair skin"; "clinically tested" no outcome; before/after no lighting disclaimer; disclosure after 30s.
-PASS: appearance-only ("looks smoother","feels hydrated"); FTC at start.
+WARN: "helps repair skin"; "clinically tested" no outcome; before/after showing skin condition improvement without lighting disclaimer; disclosure after 30s.
+PASS: appearance-only ("looks smoother","feels hydrated"); FTC at start; before/after showing foundation coverage, concealer, colour cosmetics, or any cosmetic effect — these are product demos, not medical claims, even without a disclaimer.
 
 CAMPAIGN RELEVANCE
 Evaluate against Brand, Product, and Brief above.
@@ -415,7 +423,7 @@ FAIL (off_brief): different product or non-beauty. Score 0–39.
 WARN (borderline): correct product present but not focus; 20–50% screen time. Score 40–64.
 PASS (on_brief): correct product >50%; named/demoed; tone fits brief. Score 65–100.
 
-EVIDENCE RULE: Spoken violation → Said: "exact words". Visual violation → static observation ("Eyeliner visibly on waterline" not "Applies eyeliner"). Never describe a spoken violation as physical, or vice versa.
+EVIDENCE RULE: Spoken violation → Said: "exact words". Visual violation → static observation ("Eyeliner visibly on waterline" not "Applies eyeliner"). Never describe a spoken violation as physical, or vice versa. If the violation is verbal, do not cite visual context as supporting evidence — the Said: quote is the entire evidence. Example: verbal waterline recommendation → Said: "I apply this to my waterline" — do NOT add "eyeliner is visible on waterline" as that is not the violation.
 
 TIMESTAMP RULE: timestamp_sec = exact second the violation occurs or is spoken. Not nearby. E.g. before/after shown at 0:31 → 31. "disgusting" spoken at 0:06 → 6.
 
